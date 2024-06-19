@@ -5,24 +5,26 @@ class ContactController {
         app.route('/identify')
             .post(async (request, response, next) => {
                 try {
+
+                    const data = {...request.body}
                     const RequestValidator = new Validator();
                     const schema = {
                         "type": "object",
                         "properties": {
-                            "email": { "type": "string", "format": "email" },
-                            "phoneNumber": { "type": "number", "minimum": 1000000000, "maximum": 9999999999 }
+                            "email": { "type": ["string", "null"], "format": "email" },
+                            "phoneNumber": { "type": ["number", "null"], "minimum": 1000000000, "maximum": 9999999999 }
                         },
                         "required": ["email", "phoneNumber"]
                     };
 
-                    const validation = RequestValidator.validate(request.body, schema);
+                    const validation = RequestValidator.validate(data, schema);
 
                     if (!validation.valid) {
                         throw new Error(`Schema Error: ${validation.errors}`);
                     }
 
                     const contactBiz = new ContactBiz();
-                    const result = await contactBiz.identify(request.body);
+                    const result = await contactBiz.identify(data);
 
                     response.json(result);
                     

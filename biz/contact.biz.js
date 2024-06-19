@@ -1,96 +1,93 @@
 const { Contact, sequelize } = require('../models/contact.model');
 
 class ContactBiz {
-    constructor() {
-        this.primaryContactId = null;
-        this.emails = [];
-        this.phoneNumbers = [];
-        this.secondaryContactIds = [];
-    }
 
     identify(data) {
         return new Promise(async (resolve, reject) => {
             try {
 
-                const { email, phoneNumber } = data;
+                let request_email = data?.email ?? null;
+                let request_phone = data?.phoneNumber ? String(data.phoneNumber) : null;
 
                 //! find all the records with the email and phoneNumber
-                const query = `SELECT * FROM Contacts WHERE email = "${email}" OR phoneNumber = "${phoneNumber}" ORDER BY id ASC`;
+                const query = `SELECT * FROM Contacts WHERE (email = ${request_email ? `'${request_email}'` : 'NULL'} OR phoneNumber = ${request_phone ? `'${request_phone}'` : 'NULL'}) ORDER BY id ASC`;
                 const contacts = await sequelize.query(query, { type: sequelize.QueryTypes.SELECT });
 
-                //! if the contacts array is empty then create a primary contact
-                let is_new_data = true;
-                if (!contacts.length) {
+                let primaryContactId;
+                let emails = [];
+                let phoneNumbers = [];
+                let secondaryContactIds = [];
+
+                if (contacts.length == 0) {
                     const payload = {
-                        email: email,
-                        phoneNumber: phoneNumber,
-                        linkedId: null,
+                        email: request_email,
+                        phoneNumber: request_phone,
                         linkPrecedence: "primary"
                     }
-                    const newContact = await Contact.create(payload);
-                    is_new_data = false;
-                    this.primaryContact = newContact.id;
-                    this.emails.push(email);
-                    this.phoneNumbers.push(phoneNumber);
+                    const only_contact = await Contact.create(payload);
+                    primaryContactId = only_contact.id
+                    if (request_email) emails.push(request_email);
+                    if (request_phone) phoneNumbers.push(request_phone);
                 }
-                else {
-                    //! find or create the primary contact 
-                    let primaryContact = contacts.find((doc) => doc.linkPrecedence === "primary");
-                    if (!primaryContact) {
-                        primaryContact = contacts[0];
-                        primaryContact.linkPrecedence = 'primary';
-                        await Contact.update({ linkPrecedence: 'primary' }, { where: { id: primaryContact.id } });
-                    }
-                    this.primaryContatctId = primaryContact.id;
 
+                else {
+                    // find the primary contact first if no primary then make the first to be primary and make the first only to be primary 
+                    let primary_contact;
+                    let is_new_data = true;
                     for (const element of contacts) {
-                        if(element.email == email && element.phoneNumber == phoneNumber ) is_new_data = false;
-                        if (element.email) this.emails.push(element.email);
-                        if (element.phoneNumber) this.phoneNumbers.push(element.phoneNumber);
-                        if (element.linkPrecedence === "secondary") this.secondaryContactIds.push(element.id);
-                        if (element.linkPrecedence === "primary" && element.id != this.primaryContactId) {
-                            //make that element to be secondary
-                            element.linkPrecedence = 'secondary';
-                            element.linkedId = this.primaryContactId;
-                            await Contact.update({ linkPrecedence: 'secondary', linkedId: this.primaryContactId }, { where: { id: element.id } });
+                        if (element.linkPrecedence === "primary") {
+                            primary_contact = element;
+                            break
                         }
                     }
-                }
-
-                if (is_new_data) {
-                    const payload = {
-                        email: email,
-                        phoneNumber: phoneNumber,
-                        linkedId: null,
-                        linkPrecedence: "secondary"
+                    if (!primary_contact) {
+                        primary_contact = contacts[0];
+                        await Contact.update({ linkPrecedence: 'primary' }, { where: { id: primary_contact.id } });
                     }
-                    const newContact = await Contact.create(payload);
-                    this.primaryContact = newContact.id;
-                    this.emails.push(email);
-                    this.phoneNumbers.push(phoneNumber);
-                    this.secondaryContactIds.push(newContact.id)
-                }
+                    primaryContactId = primary_contact.id
 
-                const result = await this.decorateResponse();
-                resolve(result);
+                    // Update the primary contacts to secondary if they exist and push it in the response
+                    for (const element of contacts) {
+
+                        if (element.email == request_email && element.phoneNumber == request_phone) is_new_data = false;
+                        if (element.email && !emails.includes(element.email)) emails.push(element.email);
+                        if (element.phoneNumber && !phoneNumbers.includes(element.phoneNumber)) phoneNumbers.push(element.phoneNumber);
+                        if (element.linkPrecedence === "secondary" && !secondaryContactIds.includes(element.id)) secondaryContactIds.push(element.id);
+                        if (element.linkPrecedence === "primary" && element.id != primaryContactId) {
+                            //make that element to be secondary
+                            element.linkPrecedence = 'secondary';
+                            element.linkedId = primaryContactId;
+                            await Contact.update({ linkPrecedence: 'secondary', linkedId: primaryContactId }, { where: { id: element.id } });
+                        }
+                    }
+
+                    if (is_new_data) {
+                        const payload = {
+                            email: request_email,
+                            phoneNumber: request_phone,
+                            linkPrecedence: "secondary"
+                        }
+                        const new_contact = await Contact.create(payload);
+                        primaryContactId = new_contact.id
+                        if (request_email) emails.push(request_email);
+                        if (request_phone) phoneNumbers.push(request_phone);
+                        secondaryContactIds.push(new_contact.id)
+                    }
+                }
+                
+                resolve({
+                    contact: {
+                        primaryContactId,
+                        emails,
+                        phoneNumbers,
+                        secondaryContactIds
+                    }
+                });
             }
             catch (error) {
                 return reject(error);
             }
         });
-    }
-
-
-    async decorateResponse() {
-        const result = {
-            contact: {
-                primaryContatctId: this.primaryContact,
-                emails: this.emails,
-                phoneNumbers: this.phoneNumbers,
-                secondaryContactIds: this.secondaryContactIds
-            }
-        }
-        return result
     }
 }
 

@@ -10,8 +10,9 @@ app.use(express.urlencoded({ extended: true }));
 // Routes will always go here 
 app.use('/', require('./routes/urls'));
 
-app.use(ErrorHandingMiddleware)
-var port = process.env.PORT || 8000;
+app.use(ErrorHandingMiddleware);
+
+const port = process.env.PORT || 8000;
 app.listen(port);
 
 console.log(`Server started on port ${port}`);

@@ -4,7 +4,7 @@ const sequelize = new Sequelize({
     storage: 'database.sqlite'
 });
 
-const Contact = sequelize.define('Contact', {
+const Contact = sequelize.define('contacts', {
     id: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
@@ -45,3 +45,4 @@ const Contact = sequelize.define('Contact', {
 });
 
 module.exports = { Contact, sequelize };
+

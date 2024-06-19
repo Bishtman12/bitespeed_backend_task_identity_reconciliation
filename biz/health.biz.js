@@ -5,9 +5,7 @@ class HealthBiz {
         return new Promise(async (resolve, reject) => {
             try {
 
-                const result = {
-                    data: "APIs Server is running"
-                };
+                const result = {data: "APIs Server is running"};
 
                 resolve(result);
             } catch (error) {
