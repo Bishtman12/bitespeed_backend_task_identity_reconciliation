@@ -69,8 +69,8 @@ class ContactBiz {
                         }
                         const new_contact = await Contact.create(payload);
                         primaryContactId = new_contact.id
-                        if (request_email) emails.push(request_email);
-                        if (request_phone) phoneNumbers.push(request_phone);
+                        if (element.email && !emails.includes(element.email)) emails.push(element.email);
+                        if (element.phoneNumber && !phoneNumbers.includes(element.phoneNumber)) phoneNumbers.push(element.phoneNumber);
                         secondaryContactIds.push(new_contact.id)
                     }
                 }
